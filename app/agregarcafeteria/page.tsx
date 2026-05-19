@@ -91,7 +91,7 @@ export default function AgregarCafeteria() {
         <div className="agregar-card">
 
             <h1 className="agregar-titulo">
-            Agregar Cafetería ☕
+            Agregar Cafetería
             </h1>
 
             <form

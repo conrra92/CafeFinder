@@ -1,7 +1,7 @@
 "use client";
 
 import PublicHeder from "@/components/layout/PublicHeder";
-import React from "react";
+import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth, configureAuthPersistence } from "@/lib/firebase-client";
 import {
@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useState } from "react";
 import PublicHeader from "@/components/layout/PublicHeder";
 
-function Login() {
+function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -154,6 +154,14 @@ function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+function Login(){
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
 
