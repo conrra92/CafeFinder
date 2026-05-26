@@ -1,66 +1,96 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { db, storage } from "@/lib/firebase/client";
+import { db } from "@/lib/firebase/client";
+import { auth } from "@/lib/firebase-client";
 
 import {
   collection,
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+import { onAuthStateChanged } from "firebase/auth";
 import PublicHeader from "@/components/layout/PublicHeder";
 
+type FeatureKey = "wifi" | "silenciosa" | "enchufes";
+
+const isAdminEmail = (email?: string | null) =>
+  email?.toLowerCase() === "admin@admin.com";
+
+const featureOptions: { key: FeatureKey; label: string }[] = [
+  { key: "wifi", label: "Wifi de Alta Velocidad" },
+  { key: "silenciosa", label: "Zona Silenciosa" },
+  { key: "enchufes", label: "Enchufes" },
+];
+
 export default function AgregarCafeteria() {
+  const router = useRouter();
 
   const [nombre, setNombre] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
-
+  const [rating, setRating] = useState("");
+  const [selectedFeatures, setSelectedFeatures] = useState<FeatureKey[]>([]);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser || !isAdminEmail(currentUser.email)) {
+        router.replace("/explorar");
+      }
+    });
 
+    return () => unsubscribe();
+  }, [router]);
+
+  function toggleFeature(feature: FeatureKey) {
+    setSelectedFeatures((current) =>
+      current.includes(feature)
+        ? current.filter((item) => item !== feature)
+        : [...current, feature]
+    );
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     try {
-
       setLoading(true);
 
       let imageUrl = "";
+      let publicId = "";
 
-      // SUBIR IMAGEN
       if (foto) {
+        const formData = new FormData();
+        formData.append("file", foto);
 
-        const imageRef = ref(
-          storage,
-          `cafeterias/${Date.now()}-${foto.name}`
-        );
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-        await uploadBytes(imageRef, foto);
+        const uploadData = await uploadRes.json();
 
-        imageUrl = await getDownloadURL(imageRef);
+        if (!uploadRes.ok || !uploadData.ok) {
+          throw new Error(uploadData.message || "No se pudo subir la imagen");
+        }
+
+        imageUrl = uploadData.data.imageUrl;
+        publicId = uploadData.data.publicId;
       }
 
-      // GUARDAR EN FIRESTORE
       await addDoc(collection(db, "cafeterias"), {
-
         nombre,
         ubicacion,
         descripcion,
         foto: imageUrl,
-
+        publicId,
+        rating: Number(rating) || 0,
+        features: selectedFeatures,
         createdAt: serverTimestamp(),
-
       });
 
       alert("Cafetería guardada ☕");
@@ -69,105 +99,116 @@ export default function AgregarCafeteria() {
       setUbicacion("");
       setDescripcion("");
       setFoto(null);
-
+      setRating("");
+      setSelectedFeatures([]);
     } catch (error) {
-
       console.error(error);
-
       alert("Error al guardar");
-
     } finally {
-
       setLoading(false);
     }
   }
 
   return (
     <div>
-        <PublicHeader />
+      <PublicHeader />
 
-        <div className="agregar-page">
-
+      <div className="agregar-page">
         <div className="agregar-card">
+          <h1 className="agregar-titulo">Agregar Cafetería</h1>
 
-            <h1 className="agregar-titulo">
-            Agregar Cafetería
-            </h1>
-
-            <form
-            onSubmit={handleSubmit}
-            className="agregar-formulario"
-            >
-
+          <form onSubmit={handleSubmit} className="agregar-formulario">
             <div className="campo">
+              <label>Nombre</label>
 
-                <label>Nombre</label>
-
-                <input
+              <input
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 required
-                />
-
+              />
             </div>
 
             <div className="campo">
+              <label>Foto</label>
 
-                <label>Foto</label>
-
-                <input
+              <input
                 type="file"
                 accept="image/*"
                 onChange={(e) => {
-                    if (e.target.files?.[0]) {
+                  if (e.target.files?.[0]) {
                     setFoto(e.target.files[0]);
-                    }
+                  }
                 }}
-                />
-
+              />
             </div>
 
             <div className="campo">
+              <label>Ubicación</label>
 
-                <label>Ubicación</label>
-
-                <input
+              <input
                 type="text"
                 value={ubicacion}
                 onChange={(e) => setUbicacion(e.target.value)}
                 required
-                />
-
+              />
             </div>
 
             <div className="campo">
+              <label>Descripción</label>
 
-                <label>Descripción</label>
-
-                <textarea
+              <textarea
                 rows={5}
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
                 required
-                />
-
+              />
             </div>
 
-            <button
-                type="submit"
-                className="btn-agregar"
-            >
-                {loading
-                ? "Guardando..."
-                : "Guardar Cafetería"}
+            <div className="campo">
+              <label>Calificación</label>
+
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.1}
+                value={rating}
+                onChange={(e) => setRating(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="campo">
+              <label>Características</label>
+
+              <div className="filtros">
+                {featureOptions.map((feature) => {
+                  const active = selectedFeatures.includes(feature.key);
+
+                  return (
+                    <label
+                      key={feature.key}
+                      className={active ? "filtro filtro--activo" : "filtro"}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() => toggleFeature(feature.key)}
+                      />
+                      <span>{feature.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button type="submit" className="btn-agregar">
+              {loading ? "Guardando..." : "Guardar Cafetería"}
             </button>
-
-            </form>
-
+          </form>
         </div>
-
-        </div>
+      </div>
     </div>
   );
 }

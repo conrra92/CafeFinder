@@ -16,6 +16,9 @@ interface PublicHeaderProps {
   isLogin?: boolean;
 }
 
+const isAdminEmail = (email?: string | null) =>
+  email?.toLowerCase() === "admin@admin.com";
+
 export default function PublicHeader({
   isLogin = false,
 }: PublicHeaderProps) {
@@ -25,6 +28,8 @@ export default function PublicHeader({
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const isAdmin = isAdminEmail(user?.email);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -107,11 +112,22 @@ export default function PublicHeader({
                       <button onClick={handleLogout}>
                         Cerrar sesión
                       </button>
-                      <button
-                        className="btn_agregar"
-                        onClick={() => router.push("/agregarcafeteria")}>
-                        Añadir Cafetería
-                      </button>
+
+                      {isAdmin && (
+                        <>
+                          <button
+                            className="btn_agregar"
+                            onClick={() => router.push("/agregarcafeteria")}>
+                            Añadir Cafetería
+                          </button>
+
+                          <button
+                            className="btn_agregar"
+                            onClick={() => router.push("/explorar?mode=delete")}>
+                            Eliminar cafeterías
+                          </button>
+                        </>
+                      )}
 
                     </div>
                   )}

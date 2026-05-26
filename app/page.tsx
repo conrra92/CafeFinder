@@ -1,11 +1,100 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PublicHeader from "@/components/layout/PublicHeder";
+import { db } from "@/lib/firebase/client";
+import { collection, getDocs } from "firebase/firestore";
+import { getDisplayRating } from "@/lib/cafeteria-rating";
+
+type FeatureKey = "wifi" | "silenciosa" | "enchufes";
+
+interface Cafeteria {
+  id: string;
+  nombre: string;
+  ubicacion: string;
+  descripcion: string;
+  foto?: string;
+  rating?: number;
+  displayRating?: number;
+  features?: FeatureKey[];
+}
+
+const featureLabels: Record<FeatureKey, string> = {
+  wifi: "Wifi de Alta Velocidad",
+  silenciosa: "Zona Silenciosa",
+  enchufes: "Enchufes",
+};
+
+const featureOrder: FeatureKey[] = ["wifi", "silenciosa", "enchufes"];
 
 const CafeFinder: React.FC = () => {
+  const router = useRouter();
+  const [cafeterias, setCafeterias] = useState<Cafeteria[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [searchMessage, setSearchMessage] = useState("");
+
+  useEffect(() => {
+    async function obtenerCafeterias() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "cafeterias"));
+
+        const lista: Cafeteria[] = [];
+
+        for (const doc of querySnapshot.docs) {
+          const data = doc.data() as Omit<Cafeteria, "id">;
+          const reviewsSnapshot = await getDocs(
+            collection(db, "cafeterias", doc.id, "reviews")
+          );
+
+          const reviews = reviewsSnapshot.docs.map((reviewDoc) => ({
+            rating: Number(reviewDoc.data().rating) || 0,
+          }));
+
+          lista.push({
+            id: doc.id,
+            ...data,
+            displayRating: getDisplayRating(data.rating ?? 0, reviews),
+          });
+        }
+
+        setCafeterias(lista);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    obtenerCafeterias();
+  }, []);
+
+  const featuredCafes = useMemo(() => {
+    return [...cafeterias].sort(
+      (a, b) =>
+        (b.displayRating ?? b.rating ?? 0) - (a.displayRating ?? a.rating ?? 0)
+    );
+  }, [cafeterias]);
+
+  const searchResults = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    return cafeterias.filter(
+      (cafe) => cafe.nombre.trim().toLowerCase() === normalizedQuery
+    );
+  }, [cafeterias, query]);
+
+  const destacados = featuredCafes.slice(0, 3);
+
   return (
     <div>
-
-      {/* HEADER */}
       <PublicHeader />
 
       <main>
@@ -21,21 +110,46 @@ const CafeFinder: React.FC = () => {
             </h1>
 
             <p className="hero__descripcion">
-              Descubre cafeterías tranquilas con WiFi de alta velocidad cerca
-              de ti. Únete a la comunidad de exploradores productivos.
+              Descubre cafeterías tranquilas con WiFi de alta velocidad y
+              espacios pensados para tu productividad.
             </p>
 
-            <form className="buscador">
-              <div className="buscador__campo">
-                <input type="text" placeholder="Cerca de:" />
-              </div>
+            <form
+              className="buscador"
+              onSubmit={(event) => {
+                event.preventDefault();
 
-              <div className="buscador__divisor"></div>
+                const normalizedQuery = searchText.trim().toLowerCase();
 
+                if (!normalizedQuery) {
+                  setSearchMessage("Escribe el nombre de una cafetería.");
+                  setQuery("");
+                  return;
+                }
+
+                const matchedCafe = cafeterias.find(
+                  (cafe) => cafe.nombre.trim().toLowerCase() === normalizedQuery
+                );
+
+                if (matchedCafe) {
+                  setSearchMessage("");
+                  router.push(`/cafeterias/${matchedCafe.id}`);
+                  return;
+                }
+
+                setQuery(normalizedQuery);
+                setSearchMessage("No existe una cafetería con ese nombre.");
+              }}
+            >
               <div className="buscador__campo">
                 <input
                   type="text"
-                  placeholder="Nombre de la cafetería o..."
+                  placeholder="Nombre de la cafetería"
+                  value={searchText}
+                  onChange={(event) => {
+                    setSearchText(event.target.value);
+                    setSearchMessage("");
+                  }}
                 />
               </div>
 
@@ -45,111 +159,155 @@ const CafeFinder: React.FC = () => {
             </form>
 
             <div className="filtros">
-              <span className="filtro">Wifi de Alta Velocidad</span>
-              <span className="filtro">Zona Silenciosa</span>
-              <span className="filtro">Enchufes</span>
+              {featureOrder.map((feature) => (
+                <Link
+                  key={feature}
+                  href={`/filtros/${feature}`}
+                  className="filtro"
+                >
+                  {featureLabels[feature]}
+                </Link>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* CAFETERÍAS */}
         <section className="seccion seccion--destacadas">
           <div className="contenedor">
-
             <div className="seccion__encabezado">
               <h2 className="seccion__titulo">
                 Cafeterías Destacadas por Productividad
               </h2>
-
-              <a href="#todas" className="seccion__ver-todas">
-                Ver todas
-              </a>
             </div>
 
-            <div className="tarjetas">
-              {[
-                {
-                  nombre: "Starbucks",
-                  img: "/img/starbucks-1.png",
-                  calificacion: "4.9",
-                  puntuacion: "95",
-                  subtexto: "Centro • a 2.4 km",
-                  etiquetas: ["100 MBPS", "MUY SILENCIOSO"],
-                },
-                {
-                  nombre: "Cielito Lindo",
-                  img: "/img/cielito-lindo.png",
-                  calificacion: "4.8",
-                  puntuacion: "98",
-                  subtexto: "Zona Oeste • a 1.1 km",
-                  etiquetas: ["50 MBPS", "MUCHOS ENCHUFES"],
-                },
-                {
-                  nombre: "Punta del cielo",
-                  img: "/img/punta-del-cielo-1.png",
-                  calificacion: "4.7",
-                  puntuacion: "92",
-                  subtexto: "Norte • a 3.5 km",
-                  etiquetas: ["80 MBPS", "REFILL GRATIS"],
-                },
-              ].map((cafe, index) => (
-                <article className="tarjeta" key={index}>
+            {loading ? (
+              <p className="loading">Cargando cafeterías...</p>
+            ) : destacados.length === 0 ? (
+              <p className="loading">
+                No hay cafeterías registradas por el momento.
+              </p>
+            ) : (
+              <div className="tarjetas">
+                {destacados.map((cafe) => (
+                  <Link
+                    href={`/cafeterias/${cafe.id}`}
+                    key={cafe.id}
+                    className="tarjeta tarjeta--clickable"
+                  >
+                    <div className="tarjeta__media">
+                      {cafe.foto ? (
+                        <img
+                          className="tarjeta__imagen"
+                          src={cafe.foto}
+                          alt={cafe.nombre}
+                        />
+                      ) : (
+                        <div className="tarjeta__imagen tarjeta__imagen--placeholder">
+                          Sin imagen ☕
+                        </div>
+                      )}
 
-                  <div className="tarjeta__media">
-                    <img
-                      className="tarjeta__imagen"
-                      src={cafe.img}
-                      alt={cafe.nombre}
-                    />
-
-                    <span className="tarjeta__calificacion">
-                      {cafe.calificacion}
-                    </span>
-                  </div>
-
-                  <div className="tarjeta__contenido">
-
-                    <div className="tarjeta__fila">
-                      <h3 className="tarjeta__titulo">
-                        {cafe.nombre}
-                      </h3>
-
-                      <span className="tarjeta__puntuacion">
-                        PUNTUACIÓN {cafe.puntuacion}
+                      <span className="tarjeta__calificacion">
+                        {(cafe.displayRating ?? cafe.rating ?? 0).toFixed(1)}
                       </span>
                     </div>
 
-                    <p className="tarjeta__subtexto">
-                      {cafe.subtexto}
-                    </p>
-
-                    <div className="tarjeta__etiquetas">
-                      {cafe.etiquetas.map((etiqueta, i) => (
-                        <span className="etiqueta" key={i}>
-                          {etiqueta}
+                    <div className="tarjeta__contenido">
+                      <div className="tarjeta__fila">
+                        <h3 className="tarjeta__titulo">{cafe.nombre}</h3>
+                        <span className="tarjeta__puntuacion">
+                          CALIFICACIÓN {(cafe.displayRating ?? cafe.rating ?? 0).toFixed(1)}
                         </span>
-                      ))}
+                      </div>
+
+                      <p className="tarjeta__subtexto">{cafe.ubicacion}</p>
+
+                      <p className="descripcion">{cafe.descripcion}</p>
+
+                      <div className="tarjeta__etiquetas">
+                        {(cafe.features ?? []).map((feature) => (
+                          <span className="etiqueta" key={feature}>
+                            {featureLabels[feature]}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-
-                  </div>
-                </article>
-              ))}
-            </div>
-
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </section>
+
+        {query.trim() && (
+          <section className="seccion seccion--busqueda">
+            <div className="contenedor">
+              <div className="seccion__encabezado">
+                <h2 className="seccion__titulo">Resultados de búsqueda</h2>
+              </div>
+
+              {searchResults.length === 0 ? (
+                <p className="loading">{searchMessage}</p>
+              ) : (
+                <div className="tarjetas">
+                  {searchResults.map((cafe) => (
+                    <Link
+                      href={`/cafeterias/${cafe.id}`}
+                      key={cafe.id}
+                      className="tarjeta tarjeta--clickable"
+                    >
+                      <div className="tarjeta__media">
+                        {cafe.foto ? (
+                          <img
+                            className="tarjeta__imagen"
+                            src={cafe.foto}
+                            alt={cafe.nombre}
+                          />
+                        ) : (
+                          <div className="tarjeta__imagen tarjeta__imagen--placeholder">
+                            Sin imagen ☕
+                          </div>
+                        )}
+
+                        <span className="tarjeta__calificacion">
+                          {(cafe.displayRating ?? cafe.rating ?? 0).toFixed(1)}
+                        </span>
+                      </div>
+
+                      <div className="tarjeta__contenido">
+                        <div className="tarjeta__fila">
+                          <h3 className="tarjeta__titulo">{cafe.nombre}</h3>
+                          <span className="tarjeta__puntuacion">
+                            CALIFICACIÓN {(cafe.displayRating ?? cafe.rating ?? 0).toFixed(1)}
+                          </span>
+                        </div>
+
+                        <p className="tarjeta__subtexto">{cafe.ubicacion}</p>
+
+                        <p className="descripcion">{cafe.descripcion}</p>
+
+                        <div className="tarjeta__etiquetas">
+                          {(cafe.features ?? []).map((feature) => (
+                            <span className="etiqueta" key={feature}>
+                              {featureLabels[feature]}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </main>
 
-      {/* FOOTER */}
       <footer className="pie">
         <div className="contenedor">
-
           <div className="pie__fila-superior">
-
             <div className="pie__marca">
-              <span className="pie__logo-texto">
-                CafeFinder
-              </span>
+              <span className="pie__logo-texto">CafeFinder</span>
             </div>
 
             <nav className="pie__navegacion">
@@ -169,18 +327,13 @@ const CafeFinder: React.FC = () => {
                 Sobre nosotros
               </a>
             </nav>
-
           </div>
 
           <div className="pie__fila-inferior">
-            <p className="pie__texto-legal">
-              © 2026 CafeFinder
-            </p>
+            <p className="pie__texto-legal">© 2026 CafeFinder</p>
           </div>
-
         </div>
       </footer>
-
     </div>
   );
 };

@@ -24,7 +24,7 @@ function LoginContent() {
 
   const router = useRouter();
   const sp = useSearchParams();
-  const redirectTo = sp.get("redirectTo") ?? "/dashboard";
+  const redirectTo = sp.get("redirectTo") ?? "/explorar";
 
   async function sessionLogin() {
     const idToken = await auth.currentUser?.getIdToken(true);
@@ -130,7 +130,7 @@ function LoginContent() {
                 const provider = new GoogleAuthProvider();
                 await signInWithPopup(auth, provider);
                 await sessionLogin();
-                router.push("/dashboard");
+                router.push("/explorar");
               } catch (e: any) {
                 setErr(e.message);
               } finally {
