@@ -6,6 +6,10 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +35,8 @@ export default function Signup() {
       // 👉 después de registrarse lo mandamos a login
       router.push("/login");
 
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e, "No se pudo crear la cuenta"));
     } finally {
       setLoading(false);
     }

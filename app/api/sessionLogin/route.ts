@@ -26,22 +26,26 @@ export async function POST(req: Request) {
 
     const response = NextResponse.json({ status: "ok" });
 
-    const cookieName = process.env.SESSION_COOKIE_NAME || "session";
+    const cookieNames = Array.from(
+      new Set([process.env.SESSION_COOKIE_NAME || "session", "session", "__session"])
+    );
 
-    response.cookies.set(cookieName, sessionCookie, {
-      httpOnly: true,
-      secure: false,
-      maxAge: expiresIn / 1000,
-      path: "/",
+    cookieNames.forEach((cookieName) => {
+      response.cookies.set(cookieName, sessionCookie, {
+        httpOnly: true,
+        secure: false,
+        maxAge: expiresIn / 1000,
+        path: "/",
+      });
     });
 
     return response;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
       console.error("🔥 ERROR REAL:", error); // 👈 AGREGA ESTO
 
       return NextResponse.json(
-        { error: error.message || "Cannot create session" },
+        { error: error instanceof Error ? error.message : "Cannot create session" },
         { status: 401 }
       );
     }

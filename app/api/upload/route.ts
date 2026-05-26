@@ -1,4 +1,5 @@
 import cloudinary from "@/lib/cloudinary";
+import type { UploadApiResponse } from "cloudinary";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const result = await new Promise<any>((resolve, reject) => {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       cloudinary.uploader
         .upload_stream(
           {
@@ -51,6 +52,11 @@ export async function POST(request: NextRequest) {
           (error, result) => {
             if (error) {
               reject(error);
+              return;
+            }
+
+            if (!result) {
+              reject(new Error("Cloudinary no devolvió resultado"));
               return;
             }
 

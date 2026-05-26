@@ -41,24 +41,25 @@ export default function FeaturePage() {
     async function obtenerCafeterias() {
       try {
         const querySnapshot = await getDocs(collection(db, "cafeterias"));
-        const lista: Cafeteria[] = [];
 
-        for (const doc of querySnapshot.docs) {
-          const data = doc.data() as Omit<Cafeteria, "id">;
+        const lista = await Promise.all(
+          querySnapshot.docs.map(async (cafeDoc) => {
+            const data = cafeDoc.data() as Omit<Cafeteria, "id">;
           const reviewsSnapshot = await getDocs(
-            collection(db, "cafeterias", doc.id, "reviews")
+            collection(db, "cafeterias", cafeDoc.id, "reviews")
           );
 
           const reviews = reviewsSnapshot.docs.map((reviewDoc) => ({
             rating: Number(reviewDoc.data().rating) || 0,
           }));
 
-          lista.push({
-            id: doc.id,
+          return {
+            id: cafeDoc.id,
             ...data,
             displayRating: getDisplayRating(data.rating ?? 0, reviews),
-          });
-        }
+          };
+          })
+        );
 
         setCafeterias(lista);
       } catch (error) {
