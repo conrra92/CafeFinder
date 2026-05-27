@@ -1,5 +1,5 @@
 import "./globals.css";
-import PublicHeader from "../components/layout/PublicHeder";
+import PublicHeder from "../components/layout/PublicHeder";
 
 export default function RootLayout({
   children,
@@ -9,6 +9,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
+       
         {children}
 
       </body>

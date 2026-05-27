@@ -310,23 +310,15 @@ const CafeFinder: React.FC = () => {
               <span className="pie__logo-texto">CafeFinder</span>
             </div>
 
-            <nav className="pie__navegacion">
-              <a href="#" className="pie__enlace">
-                Privacidad
-              </a>
+            
+            
 
-              <a href="#" className="pie__enlace">
-                Términos
-              </a>
+            
 
-              <a href="#" className="pie__enlace">
-                Soporte
-              </a>
+            
 
-              <a href="#" className="pie__enlace">
-                Sobre nosotros
-              </a>
-            </nav>
+              
+            
           </div>
 
           <div className="pie__fila-inferior">
