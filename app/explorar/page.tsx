@@ -4,11 +4,10 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { db } from "@/lib/firebase/client";
 import { auth } from "@/lib/firebase-client";
 import PublicHeader from "@/components/layout/PublicHeder";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs } from "firebase/firestore";
+// no client Firestore imports — the server API returns cafeterías
 import { getDisplayRating } from "@/lib/cafeteria-rating";
 
 interface Cafeteria {
@@ -47,26 +46,25 @@ function ExplorarContent() {
   useEffect(() => {
     async function obtenerCafeterias() {
       try {
-        const querySnapshot = await getDocs(collection(db, "cafeterias"));
+        const res = await fetch("/api/cafeterias");
+        const json = await res.json();
 
-        const lista = await Promise.all(
-          querySnapshot.docs.map(async (cafeDoc) => {
-            const data = cafeDoc.data() as Omit<Cafeteria, "id">;
-          const reviewsSnapshot = await getDocs(
-            collection(db, "cafeterias", cafeDoc.id, "reviews")
-          );
+        const lista = (json.data || []).map((item: any) => {
+          const data = item as any;
 
-          const reviews = reviewsSnapshot.docs.map((reviewDoc) => ({
-            rating: Number(reviewDoc.data().rating) || 0,
-          }));
+          const reviews = (data.reviews || []).map((r: any) => ({ rating: Number(r.rating) || 0 }));
 
           return {
-            id: cafeDoc.id,
-            ...data,
+            id: data.id,
+            nombre: data.nombre,
+            ubicacion: data.ubicacion,
+            descripcion: data.descripcion,
+            foto: data.foto,
+            publicId: data.publicId,
+            rating: data.rating,
             displayRating: getDisplayRating(data.rating ?? 0, reviews),
-          };
-          })
-        );
+          } as Cafeteria;
+        });
 
         setCafeterias(lista);
       } catch (error) {

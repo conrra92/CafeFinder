@@ -4,10 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp } from "firebase/firestore";
 import PublicHeader from "@/components/layout/PublicHeder";
 import { auth } from "@/lib/firebase-client";
-import { db } from "@/lib/firebase/client";
 
 type FeatureKey = "wifi" | "silenciosa" | "enchufes";
 
@@ -95,46 +93,37 @@ export default function CafeteriaDetallePage() {
           setCafe(null);
           return;
         }
+        const res = await fetch("/api/cafeterias");
+        const json = await res.json();
 
-        const cafeRef = doc(db, "cafeterias", id);
-        const cafeSnap = await getDoc(cafeRef);
+        const all = json.data || [];
+        const found = all.find((c: any) => c.id === id);
 
-        if (!cafeSnap.exists()) {
+        if (!found) {
           setCafe(null);
+          setReviews([]);
           return;
         }
 
-        const cafeData = cafeSnap.data() as Partial<Cafeteria> & { rating?: number };
-
         setCafe({
-          id: cafeSnap.id,
-          nombre: String(cafeData.nombre ?? "Cafetería"),
-          ubicacion: String(cafeData.ubicacion ?? "Ubicación no disponible"),
-          descripcion: String(cafeData.descripcion ?? "Sin descripción"),
-          foto: typeof cafeData.foto === "string" ? cafeData.foto : undefined,
-          rating: typeof cafeData.rating === "number" ? cafeData.rating : 0,
-          features: Array.isArray(cafeData.features)
-            ? (cafeData.features as FeatureKey[])
-            : [],
+          id: found.id,
+          nombre: String(found.nombre ?? "Cafetería"),
+          ubicacion: String(found.ubicacion ?? "Ubicación no disponible"),
+          descripcion: String(found.descripcion ?? "Sin descripción"),
+          foto: typeof found.foto === "string" ? found.foto : undefined,
+          rating: typeof found.rating === "number" ? found.rating : 0,
+          features: Array.isArray(found.features) ? found.features : [],
         });
 
-        const reviewsSnapshot = await getDocs(
-          collection(db, "cafeterias", id, "reviews")
-        );
-
         setReviews(
-          reviewsSnapshot.docs.map((reviewDoc) => {
-            const reviewData = reviewDoc.data() as Partial<Review>;
-
-            return {
-              id: reviewDoc.id,
-              userId: String(reviewData.userId ?? ""),
-              userEmail: String(reviewData.userEmail ?? "Usuario"),
-              comment: String(reviewData.comment ?? ""),
-              rating: typeof reviewData.rating === "number" ? reviewData.rating : 0,
-              createdAt: reviewData.createdAt,
-            };
-          })
+          (found.reviews || []).map((reviewDoc: any) => ({
+            id: reviewDoc.id || Math.random().toString(36).slice(2, 9),
+            userId: String(reviewDoc.userId ?? ""),
+            userEmail: String(reviewDoc.userEmail ?? "Usuario"),
+            comment: String(reviewDoc.comment ?? ""),
+            rating: typeof reviewDoc.rating === "number" ? reviewDoc.rating : 0,
+            createdAt: reviewDoc.createdAt,
+          }))
         );
       } catch (error) {
         console.error(error);
@@ -184,20 +173,27 @@ export default function CafeteriaDetallePage() {
       setIsSavingReview(true);
       setReviewMessage("");
 
-      const newReviewRef = await addDoc(
-        collection(db, "cafeterias", cafe.id, "reviews"),
-        {
+      const response = await fetch("/api/cafeterias/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cafeId: cafe.id,
           userId: user.uid,
           userEmail: user.email ?? "Usuario",
           comment: commentText.trim(),
           rating: Number(userRating),
-          createdAt: serverTimestamp(),
-        }
-      );
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || "No se pudo guardar la reseña");
+      }
 
       setReviews((current) => [
         {
-          id: newReviewRef.id,
+          id: data.id,
           userId: user.uid,
           userEmail: user.email ?? "Usuario",
           comment: commentText.trim(),

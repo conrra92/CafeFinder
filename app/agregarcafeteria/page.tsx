@@ -3,14 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { db } from "@/lib/firebase/client";
 import { auth } from "@/lib/firebase-client";
-
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import PublicHeader from "@/components/layout/PublicHeder";
 
@@ -57,41 +50,54 @@ export default function AgregarCafeteria() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
+    const ubicacionLimpia = ubicacion.trim();
+
+    if (!ubicacionLimpia) {
+      alert("La ubicacion es obligatoria");
+      return;
+    }
+
+    if (!foto) {
+      alert("La foto es obligatoria");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      let imageUrl = "";
-      let publicId = "";
+      const formData = new FormData();
+      formData.append("file", foto);
 
-      if (foto) {
-        const formData = new FormData();
-        formData.append("file", foto);
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+      const uploadData = await uploadRes.json();
 
-        const uploadData = await uploadRes.json();
-
-        if (!uploadRes.ok || !uploadData.ok) {
-          throw new Error(uploadData.message || "No se pudo subir la imagen");
-        }
-
-        imageUrl = uploadData.data.imageUrl;
-        publicId = uploadData.data.publicId;
+      if (!uploadRes.ok || !uploadData.ok) {
+        throw new Error(uploadData.message || "No se pudo subir la imagen");
       }
 
-      await addDoc(collection(db, "cafeterias"), {
-        nombre,
-        ubicacion,
-        descripcion,
-        foto: imageUrl,
-        publicId,
-        rating: Number(rating) || 0,
-        features: selectedFeatures,
-        createdAt: serverTimestamp(),
+      const response = await fetch("/api/cafeterias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre,
+          ubicacion: ubicacionLimpia,
+          descripcion,
+          foto: uploadData.data.imageUrl,
+          publicId: uploadData.data.publicId,
+          rating: Number(rating) || 0,
+          features: selectedFeatures,
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "No se pudo guardar la cafetería");
+      }
 
       alert("Cafetería guardada ☕");
 
@@ -136,10 +142,9 @@ export default function AgregarCafeteria() {
                 type="file"
                 accept="image/*"
                 onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setFoto(e.target.files[0]);
-                  }
+                  setFoto(e.target.files?.[0] ?? null);
                 }}
+                required
               />
             </div>
 
@@ -203,7 +208,7 @@ export default function AgregarCafeteria() {
               </div>
             </div>
 
-            <button type="submit" className="btn-agregar">
+            <button type="submit" className="btn-agregar" disabled={loading}>
               {loading ? "Guardando..." : "Guardar Cafetería"}
             </button>
           </form>
