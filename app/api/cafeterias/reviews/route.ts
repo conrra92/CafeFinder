@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { serverTimestamp } from "firebase-admin/firestore";
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +20,7 @@ export async function POST(request: Request) {
         userEmail: userEmail || "Usuario",
         comment: comment || "",
         rating: Number(rating) || 0,
-        createdAt: serverTimestamp(),
+        createdAt: new Date(),
       });
 
     return NextResponse.json({ ok: true, id: ref.id });
