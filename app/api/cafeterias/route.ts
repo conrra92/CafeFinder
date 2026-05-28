@@ -1,7 +1,6 @@
 import cloudinary from "@/lib/cloudinary";
 import { adminDb } from "@/lib/firebase-admin";
 import { NextResponse } from "next/server";
-import { serverTimestamp } from "firebase-admin/firestore";
 
 export async function DELETE(request: Request) {
   try {
@@ -108,7 +107,7 @@ export async function POST(request: Request) {
       publicId: publicId || null,
       rating: Number(rating) || 0,
       features: features || [],
-      createdAt: serverTimestamp(),
+      createdAt: new Date(),
     });
 
     return NextResponse.json({ ok: true, id: docRef.id });
